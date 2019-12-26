@@ -1,5 +1,6 @@
 # Raspberry Pi driver for the Texas Instruments ADS1219 ADC
 
+from smbus2 import i2c_msg as msg
 import struct, time
 
 _CHANNEL_MASK = 0b11100000
@@ -54,21 +55,23 @@ class ADS1219:
                 
     def _read_modify_write_config(self, mask, value):
         as_is = self.read_config()
-        to_be = (as_is & ~mask) | value 
-        wreg = struct.pack('BB', _COMMAND_WREG_CONFIG, to_be)
-        self._i2c.write_i2c_block_data(self._address, 0, wreg)
+        to_be = (as_is & ~mask) | value
+        write_config = self.write([_COMMAND_WREG_CONFIG, to_be])
+        self._i2c.i2c_rdwr(write_config)
         
     def read_config(self):
-        rreg = struct.pack('B', _COMMAND_RREG_CONFIG) 
-        self._i2c.write_i2c_block_data(self._address, 0, rreg)
-        config = self._i2c.read_i2c_block_data(self._address, 0, 1)
-        return config[0]
+        read_req = self.write(_COMMAND_RREG_CONFIG)
+        read = self.read(1)
+        self._i2c.i2c_rdwr(read_req, read)
+        read = list(read)
+        return read[0]
     
     def read_status(self):
-        rreg = struct.pack('B', _COMMAND_RREG_STATUS) 
-        self._i2c.write_i2c_block_data(self._address, 0, rreg)
-        status = self._i2c.read_i2c_block_data(self._address, 0, 1)
-        return status[0]
+        read_req = self.write(_COMMAND_RREG_STATUS)
+        read = self.read(1)
+        self._i2c.i2c_rdwr(read_req, read)
+        read = list(read)
+        return read[0]
 
     def set_channel(self, channel):
         self._read_modify_write_config(_CHANNEL_MASK, channel)
@@ -86,31 +89,37 @@ class ADS1219:
         self._read_modify_write_config(_VREF_MASK, vref)
         
     def read_data(self):
-        if ((self.read_config() & _CM_MASK) == CM_SINGLE):
+        if ((self.read_config() & _CM_MASK) == self.CM_SINGLE):
             self.start_sync()
             # loop until conversion is completed
             while((self.read_status() & _DRDY_MASK) == _DRDY_NO_NEW_RESULT):
                 time.sleep(100e-6)
             
-        rreg = struct.pack('B', _COMMAND_RDATA) 
-        self._i2c.write_i2c_block_data(self._address, 0, rreg)
-        data = self._i2c.read_i2c_block_data(self._address, 0, 3)
-        return struct.unpack('>I', b'\x00' + data)[0]
+        return self.read_data_irq()
     
     def read_data_irq(self):
-        rreg = struct.pack('B', _COMMAND_RDATA) 
-        self._i2c.write_i2c_block_data(self._address, 0, rreg)
-        data = self._i2c.read_i2c_block_data(self._address, 0, 3)
-        return struct.unpack('>I', b'\x00' + data)[0]
+        read_req = self.write(_COMMAND_RDATA)
+        read = self.read(3)
+        self._i2c.i2c_rdwr(read_req, read)
+        read = list(read)
+        read = struct.pack('BBB', read[0], read[1], read[2])
+
+        return struct.unpack('>I', b'\x00' + read)[0]
         
     def reset(self):
-        data = struct.pack('B', _COMMAND_RESET)
-        self._i2c.write_i2c_block_data(self._address, 0, data)
+        self.send(_COMMAND_RESET)
 
     def start_sync(self):
-        data = struct.pack('B', _COMMAND_START_SYNC)
-        self._i2c.write_i2c_block_data(self._address, 0, data)
+        self.send(_COMMAND_START_SYNC)
 
     def powerdown(self):
-        data = struct.pack('B', _COMMAND_POWERDOWN)
-        self._i2c.write_i2c_block_data(self._address, 0, data)
+        self.send(_COMMAND_POWERDOWN)
+
+    def send(self, data):
+        self._i2c.i2c_rdwr(self.write(data))
+
+    def write(self, data):
+        return msg.write(self._address, data)
+
+    def read(self, numBytes):
+        return msg.read(self._address, numBytes)
