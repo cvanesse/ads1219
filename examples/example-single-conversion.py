@@ -1,11 +1,11 @@
-import smbus
+from smbus2 import SMBus as smbus
 from ads1219 import ADS1219
 import time
 
 # This example demonstrates how to use the ADS1219 using single-shot conversion mode 
 # The ADC1219 will initiate a conversion when adc.read_data() is called 
 
-i2c = smbus(1)
+i2c = smbus(0)
 adc = ADS1219(i2c)
 
 adc.set_channel(ADS1219.CHANNEL_AIN0)

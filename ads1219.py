@@ -1,10 +1,6 @@
-# The MIT License (MIT)
-# Copyright (c) 2019 Mike Teachman
-# https://opensource.org/licenses/MIT
+# Raspberry Pi driver for the Texas Instruments ADS1219 ADC
 
-# MicroPython driver for the Texas Instruments ADS1219 ADC
-
-import struct
+import struct, time
 
 _CHANNEL_MASK = 0b11100000
 _GAIN_MASK = 0b00010000
@@ -60,18 +56,18 @@ class ADS1219:
         as_is = self.read_config()
         to_be = (as_is & ~mask) | value 
         wreg = struct.pack('BB', _COMMAND_WREG_CONFIG, to_be)
-        self._i2c.write_i2c_block_data(self._address, wreg)
+        self._i2c.write_i2c_block_data(self._address, 0, wreg)
         
     def read_config(self):
         rreg = struct.pack('B', _COMMAND_RREG_CONFIG) 
-        self._i2c.write_i2c_block_data(self._address, rreg)
-        config = self._i2c.readfrom(self._address, 1)
+        self._i2c.write_i2c_block_data(self._address, 0, rreg)
+        config = self._i2c.read_i2c_block_data(self._address, 0, 1)
         return config[0]
     
     def read_status(self):
         rreg = struct.pack('B', _COMMAND_RREG_STATUS) 
-        self._i2c.write_i2c_block_data(self._address, rreg)
-        status = self._i2c.readfrom(self._address, 1)
+        self._i2c.write_i2c_block_data(self._address, 0, rreg)
+        status = self._i2c.read_i2c_block_data(self._address, 0, 1)
         return status[0]
 
     def set_channel(self, channel):
@@ -94,27 +90,27 @@ class ADS1219:
             self.start_sync()
             # loop until conversion is completed
             while((self.read_status() & _DRDY_MASK) == _DRDY_NO_NEW_RESULT):
-                utime.sleep_us(100)        
+                time.sleep(100e-6)
             
         rreg = struct.pack('B', _COMMAND_RDATA) 
-        self._i2c.write_i2c_block_data(self._address, rreg)
-        data = self._i2c.readfrom(self._address, 3)
+        self._i2c.write_i2c_block_data(self._address, 0, rreg)
+        data = self._i2c.read_i2c_block_data(self._address, 0, 3)
         return struct.unpack('>I', b'\x00' + data)[0]
     
     def read_data_irq(self):
         rreg = struct.pack('B', _COMMAND_RDATA) 
-        self._i2c.write_i2c_block_data(self._address, rreg)
-        data = self._i2c.readfrom(self._address, 3)
+        self._i2c.write_i2c_block_data(self._address, 0, rreg)
+        data = self._i2c.read_i2c_block_data(self._address, 0, 3)
         return struct.unpack('>I', b'\x00' + data)[0]
         
     def reset(self):
         data = struct.pack('B', _COMMAND_RESET)
-        self._i2c.write_i2c_block_data(self._address, data)  
+        self._i2c.write_i2c_block_data(self._address, 0, data)
 
     def start_sync(self):
         data = struct.pack('B', _COMMAND_START_SYNC)
-        self._i2c.write_i2c_block_data(self._address, data)        
+        self._i2c.write_i2c_block_data(self._address, 0, data)
 
     def powerdown(self):
         data = struct.pack('B', _COMMAND_POWERDOWN)
-        self._i2c.write_i2c_block_data(self._address, data)
+        self._i2c.write_i2c_block_data(self._address, 0, data)
