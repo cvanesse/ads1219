@@ -60,14 +60,14 @@ class ADS1219:
         self._i2c.i2c_rdwr(write_config)
         
     def read_config(self):
-        read_req = self.write(_COMMAND_RREG_CONFIG)
+        read_req = self.write([_COMMAND_RREG_CONFIG])
         read = self.read(1)
         self._i2c.i2c_rdwr(read_req, read)
         read = list(read)
         return read[0]
     
     def read_status(self):
-        read_req = self.write(_COMMAND_RREG_STATUS)
+        read_req = self.write([_COMMAND_RREG_STATUS])
         read = self.read(1)
         self._i2c.i2c_rdwr(read_req, read)
         read = list(read)
@@ -98,7 +98,7 @@ class ADS1219:
         return self.read_data_irq()
     
     def read_data_irq(self):
-        read_req = self.write(_COMMAND_RDATA)
+        read_req = self.write([_COMMAND_RDATA])
         read = self.read(3)
         self._i2c.i2c_rdwr(read_req, read)
         read = list(read)
@@ -116,7 +116,7 @@ class ADS1219:
         self.send(_COMMAND_POWERDOWN)
 
     def send(self, data):
-        self._i2c.i2c_rdwr(self.write(data))
+        self._i2c.i2c_rdwr(self.write([data]))
 
     def write(self, data):
         return msg.write(self._address, data)
